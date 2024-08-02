@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nataly Packaging</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.2/xlsx.full.min.js"></script>
+    <style>
+        .header {
+            background-color: #FFD700; /* DHL Yellow */
+        }
+        .footer {
+            background-color: #A9A9A9; /* DHL Gray */
+        }
+        .body {
+            background-color: #FF0000; /* DHL Red */
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            min-height: calc(100vh - 12rem); /* Adjusted to take into account header and footer height */
+        }
+        .header-text {
+            color: #A9A9A9; /* Gray text */
+        }
+        .title {
+            font-size: 3rem; /* Increased font size for Packaging Stock */
+        }
+        #passwordModal {
+            display: none; 
+            position: fixed; 
+            z-index: 1; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgb(0,0,0); 
+            background-color: rgba(0,0,0,0.4); 
+        }
+        #passwordModalContent {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 300px;
+        }
+        #stockTable {
+            max-height: calc(100vh - 22rem); /* Adjusted to take into account header, footer, and other content height */
+            overflow-y: auto;
+        }
+        .small-button {
+            padding: 0.5rem;
+        }
+        .small-button:active {
+            background-color: #555;
+            transform: translateY(2px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="passwordModal">
+        <div id="passwordModalContent">
+            <span id="closeModal" style="float:right;cursor:pointer">&times;</span>
+            <p>Please enter the password:</p>
+            <input type="password" id="passwordInput" class="w-full p-2 border border-gray-300 rounded mt-1">
+            <button onclick="submitPassword()" class="w-full bg-blue-500 text-white p-1 rounded text-sm mt-2 small-button">Submit</button>
+        </div>
+    </div>
+    <div class="max-w-full mx-auto bg-white rounded-lg shadow-lg">
+        <div class="header p-6 flex justify-between items-center relative">
+            <h2 class="text-4xl font-bold text-center flex-grow title">Packaging Stock</h2>
+            <div class="text-right text-xs header-text absolute bottom-0 right-0 mb-2 mr-6">Victor Ribeiro (DHL Supply Chain)</div>
+        </div>
+        <div class="body p-6 flex">
+            <div class="w-1/2 pr-2">
+                <div class="mb-2">
+                    <label class="block text-white">Product</label>
+                    <select id="product" class="w-full p-1 border border-gray-300 rounded mt-1 small-button">
+                        <option value="Beauty Box">Beauty Box</option>
+                        <option value="Watch Box">Watch Box</option>
+                        <option value="2 Bottle">2 Bottle</option>
+                        <option value="6 Bottle">6 Bottle</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="block text-white">Quantity In</label>
+                    <input type="number" id="qtyIn" class="w-full p-1 border border-gray-300 rounded mt-1 small-button">
+                </div>
+                <div class="mb-2">
+                    <label class="block text-white">Date In</label>
+                    <input type="date" id="dateIn" class="w-full p-1 border border-gray-300 rounded mt-1 small-button">
+                </div>
+                <div class="mb-2">
+                    <label class="block text-white">Quantity Out</label>
+                    <input type="number" id="qtyOut" class="w-full p-1 border border-gray-300 rounded mt-1 small-button">
+                </div>
+                <div class="mb-2">
+                    <label class="block text-white">Date Out</label>
+                    <input type="date" id="dateOut" class="w-full p-1 border border-gray-300 rounded mt-1 small-button">
+                </div>
+                <div class="mb-2">
+                    <label class="block text-white">Destination</label>
+                    <select id="destination" class="w-full p-1 border border-gray-300 rounded mt-1 small-button">
+                        <option value="OX">OX</option>
+                        <option value="Bham">Bham</option>
+                        <option value="Traff">Traff</option>
+                        <option value="Exch">Exch</option>
+                        <option value="A FLOOR">A FLOOR</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <button onclick="registerStock()" class="w-full bg-blue-500 text-white p-1 rounded text-sm small-button">Register</button>
+                </div>
+                <div class="mb-2">
+                    <label class="block text-white">Remaining Stock</label>
+                    <input type="text" id="remainingStock" class="w-full p-1 border border-gray-300 rounded mt-1 small-button" readonly>
+                </div>
+                <div class="mb-2">
+                    <button onclick="downloadExcel()" class="w-full bg-green-500 text-white p-1 rounded text-sm small-button">Download Excel Report</button>
+                </div>
+                <div class="mb-2">
+                    <button onclick="showPasswordModal('clearHistory')" class="w-full bg-red-500 text-white p-1 rounded text-sm small-button">Clear History</button>
+                </div>
+            </div>
+            <div class="w-1/2 pl-2">
+                <h3 class="text-xl font-bold text-white mb-2 text-center">Stock Report</h3>
+                <div id="stockTable" class="overflow-y-auto max-h-full">
+                    <table class="min-w-full bg-white rounded-lg shadow">
+                        <thead>
+                            <tr>
+                                <th class="px-2 py-1 text-left">Product</th>
+                                <th class="px-2 py-1 text-left">Qty In</th>
+                                <th class="px-2 py-1 text-left">Date In</th>
+                                <th class="px-2 py-1 text-left">Qty Out</th>
+                                <th class="px-2 py-1 text-left">Date Out</th>
+                                <th class="px-2 py-1 text-left">Destination</th>
+                                <th class="px-2 py-1 text-left">Remaining Stock</th>
+                                <th class="px-2 py-1 text-left">Week Number</th>
+                                <th class="px-2 py-1 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-red-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="footer p-6">
+            <p class="text-center text-white">© 2024 Stock Registration DHL</p>
+        </div>
+    </div>
+
+    <script>
+        let stock = JSON.parse(localStorage.getItem('stock')) || {
+            "Beauty Box": 0,
+            "Watch Box": 0,
+            "2 Bottle": 0,
+            "6 Bottle": 0
+        };
+
+        let report = JSON.parse(localStorage.getItem('report')) || [];
+        let editId = null; // To store the ID of the entry being edited
+        let action = ''; // To store the action type ('edit', 'delete', 'clearHistory')
+
+        document.addEventListener('DOMContentLoaded', (event) => {
+            updateReport();
+        });
+
+        function getWeekNumber(date) {
+            const current = new Date(date);
+            const start = new Date(current.getFullYear(), 0, 1);
+            const days = Math.floor((current - start) / (24 * 60 * 60 * 1000));
+            return `Week_${Math.ceil((current.getDay() + 1 + days) / 7)}`;
+        }
+
+        function registerStock() {
+            const product = document.getElementById('product').value;
+            const qtyIn = parseInt(document.getElementById('qtyIn').value) || 0;
+            const dateIn = document.getElementById('dateIn').value;
+            const qtyOut = parseInt(document.getElementById('qtyOut').value) || 0;
+            const dateOut = document.getElementById('dateOut').value;
+            const destination = document.getElementById('destination').value;
+
+            const today = new Date().toISOString().split('T')[0];
+
+            if (qtyIn > 0 && !dateIn) {
+                alert("Victor Ribeiro said: Date In is required when Qty In is provided.");
+                return;
+            }
+
+            if (qtyOut > 0 && !dateOut) {
+                alert("Victor Ribeiro said: Date Out is required when Qty Out is provided.");
+                return;
+            }
+
+            if (qtyIn <= 0 && qtyOut <= 0) {
+                alert("Victor Ribeiro said: Invalid Qty In or Qty Out.");
+                return;
+            }
+
+            if (dateIn && dateIn > today) {
+                alert("Victor Ribeiro said: Invalid Date In, date is in the future.");
+                return;
+            }
+
+            if (dateOut && dateOut > today) {
+                alert("Victor Ribeiro said: Invalid Date Out, date is in the future.");
+                return;
+            }
+
+            let weekNumber = dateIn ? getWeekNumber(dateIn) : getWeekNumber(dateOut);
+
+            if (editId) {
+                // Update existing entry
+                const entry = report.find(item => item.id === editId);
+                if (entry) {
+                    stock[entry.product] -= (entry.qtyIn - entry.qtyOut); // Revert previous changes to stock
+
+                    entry.product = product;
+                    entry.qtyIn = qtyIn;
+                    entry.dateIn = dateIn;
+                    entry.qtyOut = qtyOut;
+                    entry.dateOut = dateOut;
+                    entry.destination = destination;
+
+                    stock[product] += (qtyIn - qtyOut); // Apply new changes to stock
+                    entry.remainingStock = stock[product];
+                    entry.weekNumber = weekNumber;
+                }
+                editId = null; // Reset editId
+            } else {
+                // Add new entry
+                stock[product] += qtyIn - qtyOut;
+
+                report.push({
+                    id: Date.now(), // Unique ID for each record
+                    product,
+                    qtyIn,
+                    dateIn,
+                    qtyOut,
+                    dateOut,
+                    destination,
+                    remainingStock: stock[product],
+                    weekNumber
+                });
+            }
+
+            localStorage.setItem('stock', JSON.stringify(stock));
+            localStorage.setItem('report', JSON.stringify(report));
+
+            updateReport();
+
+            document.getElementById('qtyIn').value = '';
+            document.getElementById('dateIn').value = '';
+            document.getElementById('qtyOut').value = '';
+            document.getElementById('dateOut').value = '';
+            document.getElementById('destination').value = 'OX';
+            updateRemainingStockField();
+        }
+
+        function updateRemainingStockField() {
+            const product = document.getElementById('product').value;
+            document.getElementById('remainingStock').value = stock[product];
+        }
+
+        function updateReport() {
+            const tbody = document.querySelector('#stockTable tbody');
+            tbody.innerHTML = '';
+            report.forEach(entry => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="border px-2 py-1">${entry.product}</td>
+                    <td class="border px-2 py-1">${entry.qtyIn}</td>
+                    <td class="border px-2 py-1">${entry.dateIn}</td>
+                    <td class="border px-2 py-1">${entry.qtyOut}</td>
+                    <td class="border px-2 py-1">${entry.dateOut}</td>
+                    <td class="border px-2 py-1">${entry.destination}</td>
+                    <td class="border px-2 py-1">${entry.remainingStock}</td>
+                    <td class="border px-2 py-1">${entry.weekNumber}</td>
+                    <td class="border px-2 py-1">
+                        <button onclick="showPasswordModal('edit', ${entry.id})" class="bg-yellow-500 text-white p-1 rounded text-xs small-button">Edit</button>
+                        <button onclick="showPasswordModal('delete', ${entry.id})" class="bg-red-500 text-white p-1 rounded text-xs small-button">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            updateRemainingStockField(); // Update the remaining stock field when the report is updated
+        }
+
+        function showPasswordModal(actionType, id = null) {
+            action = actionType;
+            editId = id;
+            document.getElementById('passwordInput').value = ''; // Clear the password input
+            document.getElementById('passwordModal').style.display = 'block';
+        }
+
+        function submitPassword() {
+            const password = document.getElementById('passwordInput').value;
+            if (password === "abcd@1234") {
+                document.getElementById('passwordModal').style.display = 'none';
+                if (action === 'edit') {
+                    editEntry(editId);
+                } else if (action === 'delete') {
+                    if (confirm("Are you sure you want to delete this entry?")) {
+                        deleteEntry(editId);
+                    }
+                } else if (action === 'clearHistory') {
+                    clearHistory();
+                }
+            } else {
+                alert("Incorrect code. Unable to proceed.");
+            }
+        }
+
+        document.getElementById('closeModal').onclick = function() {
+            document.getElementById('passwordModal').style.display = 'none';
+        }
+
+        function editEntry(id) {
+            const entry = report.find(item => item.id === id);
+            if (entry) {
+                document.getElementById('product').value = entry.product;
+                document.getElementById('qtyIn').value = entry.qtyIn;
+                document.getElementById('dateIn').value = entry.dateIn;
+                document.getElementById('qtyOut').value = entry.qtyOut;
+                document.getElementById('dateOut').value = entry.dateOut;
+                document.getElementById('destination').value = entry.destination;
+
+                editId = id; // Set editId
+                updateRemainingStockField(); // Update the remaining stock field when editing an entry
+            }
+        }
+
+        function deleteEntry(id) {
+            const index = report.findIndex(item => item.id === id);
+            if (index !== -1) {
+                const [removedEntry] = report.splice(index, 1);
+
+                stock[removedEntry.product] -= (removedEntry.qtyIn - removedEntry.qtyOut);
+
+                localStorage.setItem('stock', JSON.stringify(stock));
+                localStorage.setItem('report', JSON.stringify(report));
+
+                updateReport();
+                updateRemainingStockField(); // Update the remaining stock field when deleting an entry
+            }
+        }
+
+        function clearHistory() {
+            if (confirm("Are you sure you want to clear the entire history?")) {
+                report = [];
+                stock = {
+                    "Beauty Box": 0,
+                    "Watch Box": 0,
+                    "2 Bottle": 0,
+                    "6 Bottle": 0
+                };
+                localStorage.setItem('stock', JSON.stringify(stock));
+                localStorage.setItem('report', JSON.stringify(report));
+                updateReport();
+                updateRemainingStockField();
+            }
+        }
+
+        function downloadExcel() {
+            const wb = XLSX.utils.book_new();
+            const ws_data = [
+                ["Product", "Quantity In", "Date In", "Quantity Out", "Date Out", "Destination", "Remaining Stock", "Week Number"]
+            ];
+            report.forEach(entry => {
+                ws_data.push([
+                    entry.product,
+                    entry.qtyIn,
+                    entry.dateIn,
+                    entry.qtyOut,
+                    entry.dateOut,
+                    entry.destination,
+                    entry.remainingStock,
+                    entry.weekNumber
+                ]);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            XLSX.utils.book_append_sheet(wb, ws, "Stock Report");
+            XLSX.writeFile(wb, "Stock_Report.xlsx");
+        }
+    </script>
+</body>
+</html>
